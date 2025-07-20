@@ -2,6 +2,9 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <filesystem>
+
+namespace fs = std::filesystem;
 
 std::vector<std::vector<double>> lerArquivo(const std::string& caminhoArquivo) {
     std::ifstream arquivo(caminhoArquivo);
@@ -22,14 +25,18 @@ std::vector<std::vector<double>> lerArquivo(const std::string& caminhoArquivo) {
 }
 
 
-std::uint64_t lerArquivoSeed(const std::string& caminho, std::size_t inicio, std::size_t fim) {
-    std::ifstream arquivo(caminho);
+std::uint64_t lerArquivoSeed(const std::string& nomeArquivo, std::size_t inicio, std::size_t fim) {
+    // Pega o caminho completo do executável atual
+    fs::path caminhoExecutavel = fs::current_path(); // Pasta onde o programa está sendo executado
+    fs::path caminhoArquivo = caminhoExecutavel / nomeArquivo;
+
+    std::ifstream arquivo(caminhoArquivo);
     if (!arquivo.is_open()) {
-        throw std::runtime_error("Erro ao abrir o arquivo.");
+        throw std::runtime_error("Erro ao abrir o arquivo: " + caminhoArquivo.string());
     }
 
     std::string linhaCompleta;
-    std::getline(arquivo, linhaCompleta); // Lê toda a linha (assumindo que o número está em uma só linha)
+    std::getline(arquivo, linhaCompleta);
     arquivo.close();
 
     if (fim > linhaCompleta.size() || inicio >= fim) {
@@ -37,12 +44,9 @@ std::uint64_t lerArquivoSeed(const std::string& caminho, std::size_t inicio, std
     }
 
     std::string trecho = linhaCompleta.substr(inicio, fim - inicio);
-    
-    // Remove possíveis zeros à esquerda (opcional, mas seguro)
     trecho.erase(0, trecho.find_first_not_of('0'));
-    if (trecho.empty()) trecho = "0"; // se tudo for zero
+    if (trecho.empty()) trecho = "0";
 
-    // Converte para uint64_t
     std::uint64_t resultado = 0;
     for (char c : trecho) {
         if (c < '0' || c > '9') {
