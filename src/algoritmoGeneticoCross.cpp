@@ -37,7 +37,7 @@ double GeneticAlgorithm::calcularDistancia(const std::vector<int> &individuo) co
 
 void GeneticAlgorithm::gerarPopulacao(vectorIndiviudos &populacao){
     // std::cout << tamPopulacao;
-    std::mt19937 geradorLocal;
+    std::mt19937 geradorLocal(seed);
     std::uniform_int_distribution<int> dist(0, tamIndividuo - 1);
     for(int i = 0; i < tamPopulacao;i++){
         Individuo newIndividuo;
@@ -50,27 +50,34 @@ void GeneticAlgorithm::gerarPopulacao(vectorIndiviudos &populacao){
 
 }
 
-vectorIndiviudos GeneticAlgorithm::selecao(vectorIndiviudos &populacao,std::mt19937 &geradorLocal){
+vectorIndiviudos GeneticAlgorithm::selecao(vectorIndiviudos &populacao, std::mt19937 &geradorLocal) {
     std::uniform_int_distribution<int> dist(0, populacao.size() - 1);
-    std::vector<Individuo> candidatos;
     std::vector<Individuo> pais;
 
-    while(pais.size() < 2){
-        candidatos.clear();
-
-        for (int i = 0; i < 4; ++i){
+    while (pais.size() < 2) {
+        std::vector<Individuo> candidatos;
+        for (int i = 0; i < 4; ++i) {
             candidatos.push_back(populacao[dist(geradorLocal)]);
         }
+
         
-        auto melhor = *std::min_element(candidatos.begin(), candidatos.end(), [](auto& a, auto& b) {
+        auto melhor = *std::min_element(candidatos.begin(), candidatos.end(), [](const Individuo& a, const Individuo& b) {
             return a.fitness < b.fitness;
         });
 
-        pais.push_back(melhor);
-        if (pais.empty() || !(melhor.genes == pais[0].genes)) { pais.push_back(melhor); }
         
+        bool duplicado = false;
+        for (const auto& p : pais) {
+            if (p.genes == melhor.genes) {
+                duplicado = true;
+                break;
+            }
+        }
+
+        if (!duplicado) {
+            pais.push_back(melhor);
+        }
     }
-    
 
     return pais;
 }

@@ -8,6 +8,21 @@
 #include <omp.h>
 #include <cmath>
 
+struct geradorLocalThread {
+    std::vector<std::mt19937> gerador;
+
+    geradorLocalThread(int seed, int nThreads)
+        : gerador(nThreads){
+        for (int i = 0; i < nThreads; ++i)
+            gerador[i].seed(seed + i);
+    }
+
+    std::mt19937 &access(int threadId) {
+        return gerador[threadId];
+    }
+};
+
+
 typedef std::vector<Individuo> vectorIndiviudos;
 
 GeneticAlgorithm::GeneticAlgorithm(int nGen, float pMut, int tPop, float nElite, const std::string& caminho,std::uint64_t seed) 
@@ -37,7 +52,7 @@ double GeneticAlgorithm::calcularDistancia(const std::vector<int> &individuo) co
 
 void GeneticAlgorithm::gerarPopulacao(vectorIndiviudos &populacao){
     // std::cout << tamPopulacao;
-    std::mt19937 geradorLocal;
+    std::mt19937 geradorLocal(seed);
     std::uniform_int_distribution<int> dist(0, tamIndividuo - 1);
     for(int i = 0; i < tamPopulacao;i++){
         Individuo newIndividuo;
@@ -50,28 +65,35 @@ void GeneticAlgorithm::gerarPopulacao(vectorIndiviudos &populacao){
 
 }
 
-vectorIndiviudos GeneticAlgorithm::selecao(vectorIndiviudos &populacao,std::mt19937 &geradorLocal){
+vectorIndiviudos GeneticAlgorithm::selecao(vectorIndiviudos &populacao, std::mt19937 &geradorLocal) {
     std::uniform_int_distribution<int> dist(0, populacao.size() - 1);
-    std::vector<Individuo> candidatos;
     std::vector<Individuo> pais;
 
-    while(pais.size() < 2){
-        candidatos.clear();
-
-        for (int i = 0; i < 4; ++i){
+    while (pais.size() < 2) {
+        // Realiza torneio com 4 candidatos
+        std::vector<Individuo> candidatos;
+        for (int i = 0; i < 4; ++i) {
             candidatos.push_back(populacao[dist(geradorLocal)]);
         }
+
         
-        auto melhor = *std::min_element(candidatos.begin(), candidatos.end(), [](auto& a, auto& b) {
+        auto melhor = *std::min_element(candidatos.begin(), candidatos.end(), [](const Individuo& a, const Individuo& b) {
             return a.fitness < b.fitness;
         });
 
-        pais.push_back(melhor);
-        if (pais.empty() || !(melhor.genes == pais[0].genes)) { pais.push_back(melhor); }
-        
-    }
-    
 
+        bool duplicado = false;
+        for (const auto& p : pais) {
+            if (p.genes == melhor.genes) {
+                duplicado = true;
+                break;
+            }
+        }
+
+        if (!duplicado) {
+            pais.push_back(melhor);
+        }
+    }
     return pais;
 }
 
@@ -136,6 +158,9 @@ Individuo GeneticAlgorithm::crossoverOX(const Individuo &pai1, const Individuo &
 
 void GeneticAlgorithm::executarAlgoritmo(){
     omp_set_num_threads(4);
+    geradorLocalThread geradorLocal(seed,4);
+    std::uniform_real_distribution<double> distLocal(0, 1);
+
     vectorIndiviudos populacao;
     gerarPopulacao(populacao);
     Individuo melhor = melhorIndividuo(populacao);
@@ -150,19 +175,16 @@ void GeneticAlgorithm::executarAlgoritmo(){
         {
             int numThreads = omp_get_num_threads();
             int threadId = omp_get_thread_num();
-            int porThread = trunc(numFilhos / numThreads);
-            
-            std::mt19937 geradorLocal(seed + geracao + threadId);
-            std::uniform_real_distribution<double> distLocal(0, 1);
+                    
             #pragma omp for schedule(static)
             for(int i = 0; i < numFilhos; i++){
                 
                 vectorIndiviudos pais;
-                pais = selecao(populacao,geradorLocal);
-                Individuo prole = crossoverOX(pais[0],pais[1],geradorLocal);
-                double mutacaoPro = distLocal(geradorLocal);
+                pais = selecao(populacao,geradorLocal.access(threadId));
+                Individuo prole = crossoverOX(pais[0],pais[1],geradorLocal.access(threadId));
+                double mutacaoPro = distLocal(geradorLocal.access(threadId));
                 if(mutacaoPro < probMutacao){
-                    mutacao(prole,geradorLocal);
+                    mutacao(prole,geradorLocal.access(threadId));
                 }
                 novaPopulacao[i] = prole;
             }

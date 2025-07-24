@@ -26,8 +26,7 @@ std::vector<std::vector<double>> lerArquivo(const std::string& caminhoArquivo) {
 
 
 std::uint64_t lerArquivoSeed(const std::string& nomeArquivo, std::size_t inicio, std::size_t fim) {
-    // Pega o caminho completo do executável atual
-    fs::path caminhoExecutavel = fs::current_path(); // Pasta onde o programa está sendo executado
+    fs::path caminhoExecutavel = fs::current_path();
     fs::path caminhoArquivo = caminhoExecutavel / nomeArquivo;
 
     std::ifstream arquivo(caminhoArquivo);
